@@ -83,6 +83,7 @@ class SimpleSynthesis(gym.Env):
     def add_reagent(self, action):
         print('self STATE', self.state)
         action = self.map[action]
+        path = self.path
         if action == 'next':
             reactions_list = self.reactions_list
             if len(reactions_list) == 0:
@@ -93,9 +94,14 @@ class SimpleSynthesis(gym.Env):
                     return self.state, None, reward, {'info': 'no another reaction products at the list'}
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
+                path[-1] = reaction # заменяем последнюю реакцию в пути
+                self.reactions_list = reactions_list
+                self.path = path
                 return state, reaction, reward, {}
             else:
                 state, reaction, reward = reactions_list[0]
+                path[-1] = reaction
+                self.path = path
                 return state, reaction, reward, {'info': 'the last molecule at the list'}
 
         if action == 'none':  # однореагентная реакция
@@ -136,12 +142,18 @@ class SimpleSynthesis(gym.Env):
 
         if reactions_list:
             reactions_list = self.best_n_molecules(reactions_list, 10)
-            self.reactions_list = reactions_list
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
+                path.append(reaction)
+                self.reactions_list = reactions_list
+                self.path = path
                 return state, reaction, reward, {}
             else:
                 state, reaction, reward = reactions_list[0]
+                if path[-1] != reaction:
+                    path.append(reaction) # реакция добавляется в путь, если она не была добавлена только что
+                self.reactions_list = reactions_list
+                self.path = path
                 return state, reaction, reward, {'info': 'the last molecule at the list'}
         else:
             reward = self.evaluation(self.state, self.target)
