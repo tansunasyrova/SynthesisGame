@@ -4,12 +4,6 @@ from gym.utils import seeding
 from CGRtools import Reactor
 from CGRtools.containers import MoleculeContainer
 from CGRtools.containers import ReactionContainer
-from CGRtools.files import RDFwrite
-from CIMtools.preprocessing import FragmentorFingerprint
-from CGRdb import load_schema
-from pony.orm import db_session
-from pickle import load
-from io import StringIO
 from helper import *
 from config import *
 
@@ -36,15 +30,15 @@ class SimpleSynthesis(gym.Env):
     def render(self, mode='human'):
         return self.path
 
-    single_rules = load(open('/home/tansu/rnn/indexed_single_rules.pickle', 'rb'))
-    double_rules = load(open('/home/tansu/rnn/indexed_two_rules.pickle', 'rb'))
-    groups = load(open('/home/tansu/rnn/groups_common_very_new.pickle', 'rb'))
+    single_rules = single_rules
+    double_rules = double_rules
+    groups = groups
 
     def __init__(self, target, step_number=10):
         self.target = target
         with db_session:
             self.db = load_schema('bb', user=user, password=password, database=database, host=host)
-        self.map = self.dictionary(self.db)
+        self.map = dictionary(self.db)
         self.action_space = list(self.map)
         self.observation_space = MoleculeContainer
         self.seed()
@@ -90,7 +84,7 @@ class SimpleSynthesis(gym.Env):
                 if self.state is None:
                     return None, None, -1, {'info': 'no reaction products found'}
                 else:
-                    reward = self.evaluation(self.state, self.target)
+                    reward = evaluation(self.state, self.target)
                     return self.state, None, reward, {'info': 'no another reaction products at the list'}
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
@@ -109,8 +103,8 @@ class SimpleSynthesis(gym.Env):
                 return None, None, -1, {'info': 'no current molecule'}
             else:
                 reactions_list = []
-                group_list = self.group_list(self.state)
-                rules = self.reactions_by_fg(group_list, 1)
+                group_list = group_list(self.state)
+                rules = reactions_by_fg(group_list)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
                     reactions = list(reactor([self.state]))
@@ -122,8 +116,8 @@ class SimpleSynthesis(gym.Env):
             with db_session:
                 reagent = self.db.Molecule[action].structure
             if self.state:
-                group_list = self.group_list(self.state)
-                rules = self.reactions_by_fg(group_list, 2)
+                group_list = group_list(self.state)
+                rules = reactions_by_fg(group_list, single=False)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
                     reactions = list(reactor([self.state, reagent]))
@@ -131,8 +125,8 @@ class SimpleSynthesis(gym.Env):
                         for new_mol in reactions[0].products:
                             reactions_list.append(ReactionContainer(self.state, new_mol))
             else:
-                group_list = self.group_list(reagent)
-                rules = self.reactions_by_fg(group_list, 1)
+                group_list = group_list(reagent)
+                rules = reactions_by_fg(group_list)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
                     reactions = list(reactor([reagent]))
@@ -141,7 +135,7 @@ class SimpleSynthesis(gym.Env):
                             reactions_list.append(ReactionContainer(self.state, new_mol))
 
         if reactions_list:
-            reactions_list = self.best_n_molecules(reactions_list, 10)
+            reactions_list = best_n_molecules(reactions_list, 10)
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
                 path.append(reaction)
@@ -156,5 +150,5 @@ class SimpleSynthesis(gym.Env):
                 self.path = path
                 return state, reaction, reward, {'info': 'the last molecule at the list'}
         else:
-            reward = self.evaluation(self.state, self.target)
+            reward = evaluation(self.state, self.target)
             return self.state, None, reward, {'info': 'no new reaction products at the list'}

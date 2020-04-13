@@ -1,15 +1,16 @@
 from CGRdb import load_schema
-from CGRtools import CGRpreparer, Reactor
+from CGRtools import CGRpreparer
 from CGRtools.containers import ReactionContainer
 from CGRdb.search.fingerprints import FingerprintMolecule
 from CGRtools.files.SDFrw import SDFread
 from operator import itemgetter
-from pony.orm import db_session, sql_debug, select
-from CGRtools.files import RDFwrite, RDFread, SDFwrite
+from pony.orm import db_session
+from CGRtools.files import RDFread, SDFwrite
 import pickle
 from datetime import datetime
+from config import *
 
-db = load_schema('bb')
+db = load_schema('bb', user=user, password=password, database=database, host=host)
 Reagents = db.Molecule
 
 def fill_mol_mol_class():
@@ -27,7 +28,6 @@ def fill_mol_mol_class():
         with db_session:
             Reagents[mol_id].classes = [db.MoleculeClass[x] for x in id_list]
 
-
 @db_session
 def fill_the_reagents_base():
     """
@@ -38,14 +38,12 @@ def fill_the_reagents_base():
         if not Reagents.structure_exists(mol):  # проверка есть ли это в базе или нет
             Reagents(mol, db.User[1])
 
-
 @db_session
 def fill_db_with_fg():
     with open('group_dict_12.pickle', 'rb') as f:
         group_dict = pickle.load(f)
     for n, group in group_dict.items():
         db.MoleculeClass(id=n, name=str(group), _type=0)
-
 
 @db_session
 def index_reagents():
@@ -59,7 +57,6 @@ def index_reagents():
                 print('ura')
                 group_list.append(n)
         mol.classes = [db.MoleculeClass[x] for x in group_list]
-
 
 def fg_in_react():
     fg_in_react_dict = dict()
@@ -85,7 +82,6 @@ def fg_in_react():
     with open('fg_in_react_dict.pickle', 'wb') as f:
         pickle.dump(fg_in_react_dict, f)
 
-
 def fg_structure_id():
     group_dict = {}
     groups = set(SDFread('groups.sdf'))
@@ -93,10 +89,6 @@ def fg_structure_id():
         group_dict[n] = group
     with open('group_dict.pickle', 'wb') as f:
         pickle.dump(group_dict, f)
-
-# Reagents = db_new_reagents.Molecule
-# New_groups = db_new_groups.Molecule
-
 
 def mol_number():
     return [mol.id for mol in db.Molecule.select()]
@@ -113,10 +105,6 @@ def dictionary():
     mol_dict[a+1] =
 
     return mol_dict
-
-
-#def mol_with_fg(group_id_list):
-#    return list(select(molecule for molecule in db.Molecule if all(db.MoleculeClass[x] in molecule.classes for x in group_id_list)))
 
 def mol_with_fg(group_id_list):
     fg_mol_dict = dict()

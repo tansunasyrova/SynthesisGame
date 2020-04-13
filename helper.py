@@ -1,6 +1,10 @@
 from pony.orm import db_session
 from operator import itemgetter
+from CGRdb import load_schema
 from CIMtools.preprocessing import FragmentorFingerprint
+from config import *
+
+db = load_schema('bb', user=user, password=password, database=database, host=host)
 
 
 def dictionary(db):
@@ -28,7 +32,7 @@ def evaluation(mol1, mol2):
     return common / (mol1_c + mol2_c - common)
 
 
-def best_n_molecules(self, reactions_list, n):
+def best_n_molecules(reactions_list, n):
     tanimoto_list = []
     for reaction in reactions_list:
         for product in reaction.products:
@@ -36,34 +40,27 @@ def best_n_molecules(self, reactions_list, n):
     return sorted(tanimoto_list, key=itemgetter(2), reverse=True)[:n]
 
 
-def reactions_by_fg(self, group_id_list, n):
+def reactions_by_fg(group_id_list, single=True):
     reactions_list = []
-    if n == 1:
-        for react in self.single_rules:
-            reaction_groups = self.single_rules[react]
-            if any(group in reaction_groups for group in group_id_list):
-                reactions_list.append(react)
-    if n == 2:
-        for react in self.double_rules:
-            reaction_groups = self.double_rules[react]
-            if any(group in reaction_groups for group in group_id_list):
-                reactions_list.append(react)
+    rules = single_rules if single else double_rules
+    for react in rules:
+        reaction_groups = rules[react]
+        if any(group in reaction_groups for group in group_id_list):
+            reactions_list.append(react)
     return reactions_list
 
 
-def group_list(self, structure):
+def group_list(structure):
     with db_session:
-        molecule = self.db.Molecule.find_structure(structure)
+        molecule = db.Molecule.find_structure(structure)
     if molecule:
         with db_session:
-            group_list = [x.id for x in self.db.Molecule[molecule.id].classes]
+            group_list = [x.id for x in db.Molecule[molecule.id].classes]
     else:
-        group_list = []
         molecule = structure
-        for i, fg in self.groups.items():
-            if fg < molecule:
-                group_list.append(i)
+        with db_session:
+            group_list = [i for i, fg in groups.items() if fg < molecule]
     return group_list
 
 
-__all__ = ['dictionary', 'evaluation', 'best_n_molecules', 'reactions_by_fg', 'group_list']
+__all__ = [dictionary, evaluation, best_n_molecules, reactions_by_fg, group_list]
