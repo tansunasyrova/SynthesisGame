@@ -18,11 +18,11 @@ def random_func(n):
         print(action, ',', play.step(action))
 
 
-mol = SMILESread(StringIO("CCCOC")).read()[0]
-target = SDFread('serotonine.sdf').read()[0]
+target = SMILESread(StringIO("CCCOC")).read()[0]
+#target = SDFread('serotonine.sdf').read()[0]
 target.implicify_hydrogens()
 print(target)
-play = synthesis.SimpleSynthesis(target, step_number=20)
+play = synthesis.SimpleSynthesis(target, step_number=100)
 
 
 random_func(100)

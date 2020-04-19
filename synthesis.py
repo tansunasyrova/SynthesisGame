@@ -1,7 +1,9 @@
 import gym
 from gym import spaces
+from pony.orm import db_session
 from gym.utils import seeding
 from CGRtools import Reactor
+from CGRdb import load_schema
 from CGRtools.containers import MoleculeContainer
 from CGRtools.containers import ReactionContainer
 from helper import *

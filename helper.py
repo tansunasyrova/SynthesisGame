@@ -63,4 +63,4 @@ def group_list(structure):
     return group_list
 
 
-__all__ = [dictionary, evaluation, best_n_molecules, reactions_by_fg, group_list]
+__all__ = ['dictionary', 'evaluation', 'best_n_molecules', 'reactions_by_fg', 'group_list']
