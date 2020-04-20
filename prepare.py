@@ -6,6 +6,7 @@ from CGRtools.files.SDFrw import SDFread
 from operator import itemgetter
 from pony.orm import db_session
 from CGRtools.files import RDFread, SDFwrite
+from CGRdb import load_schema, Molecule
 import pickle
 from datetime import datetime
 from config import *
@@ -13,11 +14,12 @@ from config import *
 db = load_schema('bb', user=user, password=password, database=database, host=host)
 Reagents = db.Molecule
 
+
 def fill_mol_mol_class():
     with open('group_dict_12.pickle', 'rb') as f:
         group_dict = pickle.load(f)
     with db_session:
-        reagents = list(Reagents.select())
+        reagents = list(db.Molecule.select())
         id_mol_dict = {molecule.id: molecule.structure for molecule in reagents}
     for mol_id, molecule in id_mol_dict.items():
         id_list = []
@@ -27,6 +29,7 @@ def fill_mol_mol_class():
                     id_list.append(i)
         with db_session:
             Reagents[mol_id].classes = [db.MoleculeClass[x] for x in id_list]
+
 
 @db_session
 def fill_the_reagents_base():
@@ -38,12 +41,14 @@ def fill_the_reagents_base():
         if not Reagents.structure_exists(mol):  # проверка есть ли это в базе или нет
             Reagents(mol, db.User[1])
 
+
 @db_session
 def fill_db_with_fg():
     with open('group_dict_12.pickle', 'rb') as f:
         group_dict = pickle.load(f)
     for n, group in group_dict.items():
         db.MoleculeClass(id=n, name=str(group), _type=0)
+
 
 @db_session
 def index_reagents():
@@ -57,6 +62,7 @@ def index_reagents():
                 print('ura')
                 group_list.append(n)
         mol.classes = [db.MoleculeClass[x] for x in group_list]
+
 
 def fg_in_react():
     fg_in_react_dict = dict()
@@ -82,6 +88,7 @@ def fg_in_react():
     with open('fg_in_react_dict.pickle', 'wb') as f:
         pickle.dump(fg_in_react_dict, f)
 
+
 def fg_structure_id():
     group_dict = {}
     groups = set(SDFread('groups.sdf'))
@@ -90,21 +97,6 @@ def fg_structure_id():
     with open('group_dict.pickle', 'wb') as f:
         pickle.dump(group_dict, f)
 
-def mol_number():
-    return [mol.id for mol in db.Molecule.select()]
-
-
-def dictionary():
-    mol_dict = {}
-    mol_ids = [mol.id for mol in db.Molecule.select()]
-    a = 0
-    for n, id in enumerate(mol_ids):
-        mol_dict[n] = id
-        a += 1
-    mol_dict[a] = None
-    mol_dict[a+1] =
-
-    return mol_dict
 
 def mol_with_fg(group_id_list):
     fg_mol_dict = dict()
@@ -139,28 +131,6 @@ def reactions_with_fg(group_id_list):
         if any(group in l for group in group_id_list):
             reactions_list.append(react)
     return reactions_list
-
-
-def evaluation(mol1, mol2):
-    """
-    оценка нод.
-    возвращает танимото для пары запрос-результат.
-    """
-    mol1_fp = FingerprintMolecule.get_fingerprint(mol1)
-    mol2_fp = FingerprintMolecule.get_fingerprint(mol2)
-    mol1_c, mol2_c, common = len(mol1_fp), len(mol2_fp), len(mol1_fp.intersection(mol2_fp))
-    return common / (mol1_c + mol2_c - common)
-
-
-def best_tanimoto(target, mol_list):
-    tanimoto_list = [(x, evaluation(x, target)) for x in mol_list]
-    return sorted(tanimoto_list, key=itemgetter(1), reverse=True)[0]
-
-
-def best_n_molecules(target, mol_list, n):
-    tanimoto_list = [(x, evaluation(x, target)) for x in mol_list]
-    return sorted(tanimoto_list, key=itemgetter(1), reverse=True)[:n]
-
 
 
 startTime = datetime.now()

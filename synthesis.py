@@ -32,10 +32,6 @@ class SimpleSynthesis(gym.Env):
     def render(self, mode='human'):
         return self.path
 
-    single_rules = single_rules
-    double_rules = double_rules
-    groups = groups
-
     def __init__(self, target, step_number=10):
         self.target = target
         with db_session:
@@ -69,8 +65,7 @@ class SimpleSynthesis(gym.Env):
         return self.state, reward, done, info
 
     def reset(self):
-        with db_session:
-            self.state = None
+        self.state = None
         self.steps = 0
         self.reactions_list = []
         self.path = []
@@ -137,7 +132,7 @@ class SimpleSynthesis(gym.Env):
                             reactions_list.append(ReactionContainer(self.state, new_mol))
 
         if reactions_list:
-            reactions_list = best_n_molecules(reactions_list, 10)
+            reactions_list = best_n_molecules(reactions_list, self.target, 10)
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
                 path.append(reaction)
