@@ -1,10 +1,7 @@
-from pony.orm import db_session
-from operator import itemgetter
-from CGRdb import load_schema, Molecule
 from CIMtools.preprocessing import FragmentorFingerprint
 from config import *
-
-#db = load_schema('bb', user=user, password=password, database=database, host=host)
+from operator import itemgetter
+from pony.orm import db_session
 
 
 def dictionary(db):
@@ -35,7 +32,10 @@ def evaluation(mol1, mol2):
 def best_n_molecules(reactions_list, target, n):
     tanimoto_list = []
     for reaction in reactions_list:
+        # print('i am reaction from reactionlist', reaction)
+        # print('!reaction.products!', reaction.products)
         for product in reaction.products:
+            # print('PRODUCT', product)
             tanimoto_list.append((product, reaction, evaluation(product, target)))
     return sorted(tanimoto_list, key=itemgetter(2), reverse=True)[:n]
 
@@ -50,12 +50,12 @@ def reactions_by_fg(group_id_list, single=True):
     return reactions_list
 
 
-def group_list(structure):
+def group_list(structure, db):
     with db_session:
-        molecule = Molecule.find_structure(structure)
+        molecule = db.Molecule.find_structure(structure)
     if molecule:
         with db_session:
-            groups_list = [x.id for x in Molecule[molecule.id].classes]
+            groups_list = [x.id for x in db.Molecule[molecule.id].classes]
     else:
         molecule = structure
         with db_session:

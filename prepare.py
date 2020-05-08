@@ -1,15 +1,11 @@
 from CGRdb import load_schema
-from CGRtools import CGRpreparer
 from CGRtools.containers import ReactionContainer
-from CGRdb.search.fingerprints import FingerprintMolecule
-from CGRtools.files.SDFrw import SDFread
-from operator import itemgetter
-from pony.orm import db_session
 from CGRtools.files import RDFread, SDFwrite
-from CGRdb import load_schema, Molecule
-import pickle
-from datetime import datetime
+from CGRtools.files.SDFrw import SDFread
 from config import *
+from datetime import datetime
+import pickle
+from pony.orm import db_session
 
 db = load_schema('bb', user=user, password=password, database=database, host=host)
 Reagents = db.Molecule
@@ -80,7 +76,7 @@ def fg_in_react():
                 fg_in_react_dict[react] = groups_list
         else:
             for reactant in react.reactants:
-                groups_list = [] # думаю, что здесь нужно его создавать
+                groups_list = []  # думаю, что здесь нужно его создавать
                 for i in group_dict:
                     if group_dict[i] < reactant:
                         groups_list.append(i)
@@ -135,7 +131,6 @@ def reactions_with_fg(group_id_list):
 
 startTime = datetime.now()
 fg_fg = {}
-preparer = CGRpreparer()
 
 
 def group_search_and_pickles():

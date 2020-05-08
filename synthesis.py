@@ -1,13 +1,11 @@
-import gym
-from gym import spaces
-from pony.orm import db_session
-from gym.utils import seeding
-from CGRtools import Reactor
 from CGRdb import load_schema
+from CGRtools import Reactor
 from CGRtools.containers import MoleculeContainer
-from CGRtools.containers import ReactionContainer
-from helper import *
 from config import *
+from gym.utils import seeding
+from helper import *
+from pony.orm import db_session
+import gym
 
 
 class SimpleSynthesis(gym.Env):
@@ -29,9 +27,6 @@ class SimpleSynthesis(gym.Env):
         The maximum number of steps is reached.
     """
 
-    def render(self, mode='human'):
-        return self.path
-
     def __init__(self, target, step_number=10):
         self.target = target
         with db_session:
@@ -46,6 +41,9 @@ class SimpleSynthesis(gym.Env):
         self.steps = 0
         self.max_steps = step_number
         self.np_random = None
+
+    def render(self, mode='human'):
+        return self.path
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -85,7 +83,11 @@ class SimpleSynthesis(gym.Env):
                     return self.state, None, reward, {'info': 'no another reaction products at the list'}
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
-                path[-1] = reaction # заменяем последнюю реакцию в пути
+                if len(path) >= 1:
+                    path[-1] = reaction
+                else:
+                    path.append(reaction)
+                path[-1] = reaction  # заменяем последнюю реакцию в пути
                 self.reactions_list = reactions_list
                 self.path = path
                 return state, reaction, reward, {}
@@ -100,39 +102,49 @@ class SimpleSynthesis(gym.Env):
                 return None, None, -1, {'info': 'no current molecule'}
             else:
                 reactions_list = []
-                group_list = group_list(self.state)
-                rules = reactions_by_fg(group_list)
+                groups_list = group_list(self.state, self.db)
+                rules = reactions_by_fg(groups_list)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
                     reactions = list(reactor([self.state]))
                     if reactions:
-                        for new_mol in reactions[0].products:
-                            reactions_list.append(ReactionContainer(self.state, new_mol))
+                        # for new_mol in reactions[0].products:
+                            # print('!self.state, new_mol!', self.state, new_mol)
+                        reactions_list.append(reactions[0])
         else:
             reactions_list = []
             with db_session:
                 reagent = self.db.Molecule[action].structure
             if self.state:
-                group_list = group_list(self.state)
-                rules = reactions_by_fg(group_list, single=False)
+                # print('if self.state')
+                groups_list = group_list(self.state, self.db)
+                rules = reactions_by_fg(groups_list, single=False)
+                # print('RULES', rules)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
                     reactions = list(reactor([self.state, reagent]))
+                    # print('REACTIONS', reactions)
                     if reactions:
-                        for new_mol in reactions[0].products:
-                            reactions_list.append(ReactionContainer(self.state, new_mol))
+                        # for new_mol in reactions[0].products:
+                            # print('!(2) self.state, new_mol!', self.state, new_mol)
+                        reactions_list.append(reactions[0])
             else:
-                group_list = group_list(reagent)
-                rules = reactions_by_fg(group_list)
+                groups_list = group_list(reagent, self.db)
+                rules = reactions_by_fg(groups_list)
+                # print('RULES', rules)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
                     reactions = list(reactor([reagent]))
+                    # print('REACTIONS', reactions)
                     if reactions:
-                        for new_mol in reactions[0].products:
-                            reactions_list.append(ReactionContainer(self.state, new_mol))
+                        # for new_mol in reactions[0].products:
+                            # print('!(1) new_mol!', new_mol)
+                        reactions_list.append(reactions[0])
 
         if reactions_list:
+            # print('REACT LIST1', len(reactions_list), reactions_list)
             reactions_list = best_n_molecules(reactions_list, self.target, 10)
+            print('REACT LIST 10 best', reactions_list)
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
                 path.append(reaction)
@@ -141,8 +153,11 @@ class SimpleSynthesis(gym.Env):
                 return state, reaction, reward, {}
             else:
                 state, reaction, reward = reactions_list[0]
-                if path[-1] != reaction:
-                    path.append(reaction) # реакция добавляется в путь, если она не была добавлена только что
+                if len(path) >= 1:
+                    if path[-1] != reaction:
+                        path.append(reaction)  # реакция добавляется в путь, если она не была добавлена только что
+                else:
+                    path.append(reaction)
                 self.reactions_list = reactions_list
                 self.path = path
                 return state, reaction, reward, {'info': 'the last molecule at the list'}
