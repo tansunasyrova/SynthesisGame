@@ -41,6 +41,7 @@ class SimpleSynthesis(gym.Env):
         self.steps = 0
         self.max_steps = step_number
         self.np_random = None
+        self.first_step = None
 
     def render(self, mode='human'):
         return self.path
@@ -72,31 +73,30 @@ class SimpleSynthesis(gym.Env):
     def add_reagent(self, action):
         print('self STATE', self.state)
         action = self.map[action]
-        path = self.path
         if action == 'next':
-            reactions_list = self.reactions_list
-            if len(reactions_list) == 0:
+            if self.reactions_list:
+                if len(self.reactions_list) == 1:
+                    state, reaction, reward = self.reactions_list[0]
+                    if self.path:
+                        self.path[-1] = reaction  # заменяем последнюю реакцию в пути
+                    else:
+                        self.path.append(reaction)
+                    self.reactions_list[0] = self.first_step
+                    return state, reaction, reward, {'info': 'the last molecule at the list'}
+                else:
+                    state, reaction, reward = self.reactions_list.pop(0)
+                    if self.path:
+                        self.path[-1] = reaction  # заменяем последнюю реакцию в пути
+                    else:
+                        self.path.append(reaction)
+                    return state, reaction, reward, {}
+
+            else:
                 if self.state is None:
                     return None, None, -1, {'info': 'no reaction products found'}
                 else:
                     reward = evaluation(self.state, self.target)
                     return self.state, None, reward, {'info': 'no another reaction products at the list'}
-            if len(reactions_list) > 1:
-                state, reaction, reward = reactions_list.pop(0)
-                if len(path) >= 1:
-                    path[-1] = reaction
-                else:
-                    path.append(reaction)
-                path[-1] = reaction  # заменяем последнюю реакцию в пути
-                self.reactions_list = reactions_list
-                self.path = path
-                return state, reaction, reward, {}
-            else:
-                state, reaction, reward = reactions_list[0]
-                path[-1] = reaction
-                self.path = path
-                return state, reaction, reward, {'info': 'the last molecule at the list'}
-
         if action == 'none':  # однореагентная реакция
             if self.state is None:
                 return None, None, -1, {'info': 'no current molecule'}
@@ -106,11 +106,11 @@ class SimpleSynthesis(gym.Env):
                 rules = reactions_by_fg(groups_list)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
-                    reactions = list(reactor([self.state]))
+                    reactions = next(reactor([self.state]))
                     if reactions:
                         # for new_mol in reactions[0].products:
                             # print('!self.state, new_mol!', self.state, new_mol)
-                        reactions_list.append(reactions[0])
+                        reactions_list.append(reactions)
         else:
             reactions_list = []
             with db_session:
@@ -122,12 +122,12 @@ class SimpleSynthesis(gym.Env):
                 # print('RULES', rules)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
-                    reactions = list(reactor([self.state, reagent]))
+                    reactions = next(reactor([self.state, reagent]), None)
                     # print('REACTIONS', reactions)
                     if reactions:
                         # for new_mol in reactions[0].products:
                             # print('!(2) self.state, new_mol!', self.state, new_mol)
-                        reactions_list.append(reactions[0])
+                        reactions_list.append(reactions)
             else:
                 groups_list = group_list(reagent, self.db)
                 rules = reactions_by_fg(groups_list)
@@ -144,22 +144,20 @@ class SimpleSynthesis(gym.Env):
         if reactions_list:
             # print('REACT LIST1', len(reactions_list), reactions_list)
             reactions_list = best_n_molecules(reactions_list, self.target, 10)
-            print('REACT LIST 10 best', reactions_list)
+            print('REACT LIST 10 best', (len(reactions_list)), reactions_list)
+            self.first_step = reactions_list[0]
             if len(reactions_list) > 1:
                 state, reaction, reward = reactions_list.pop(0)
-                path.append(reaction)
+                self.path.append(reaction)
                 self.reactions_list = reactions_list
-                self.path = path
                 return state, reaction, reward, {}
             else:
                 state, reaction, reward = reactions_list[0]
-                if len(path) >= 1:
-                    if path[-1] != reaction:
-                        path.append(reaction)  # реакция добавляется в путь, если она не была добавлена только что
+                if self.path:
+                    self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                 else:
-                    path.append(reaction)
+                    self.path.append(reaction)
                 self.reactions_list = reactions_list
-                self.path = path
                 return state, reaction, reward, {'info': 'the last molecule at the list'}
         else:
             reward = evaluation(self.state, self.target)

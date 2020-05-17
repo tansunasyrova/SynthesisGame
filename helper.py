@@ -35,8 +35,8 @@ def best_n_molecules(reactions_list, target, n):
         # print('i am reaction from reactionlist', reaction)
         # print('!reaction.products!', reaction.products)
         for product in reaction.products:
-            # print('PRODUCT', product)
             tanimoto_list.append((product, reaction, evaluation(product, target)))
+    tanimoto_list = list(set(tanimoto_list))
     return sorted(tanimoto_list, key=itemgetter(2), reverse=True)[:n]
 
 
