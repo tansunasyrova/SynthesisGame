@@ -1,3 +1,4 @@
+from CGRtools.containers import ReactionContainer
 from CIMtools.preprocessing import FragmentorFingerprint
 from config import *
 from operator import itemgetter
@@ -34,10 +35,12 @@ def best_n_molecules(reactions_list, target, n):
     for reaction in reactions_list:
         # print('i am reaction from reactionlist', reaction)
         # print('!reaction.products!', reaction.products)
-        for product in reaction.products:
-            tanimoto_list.append((product, reaction, evaluation(product, target)))
+        product = [sorted(reaction.products, key=lambda x: x.molecular_mass, reverse=True)][0]
+        meta = {'tanimoto': evaluation(product[0], target)}
+        new_reaction = ReactionContainer(reactants=reaction.reactants, products=product, meta=meta)
+        tanimoto_list.append(new_reaction)
     tanimoto_list = list(set(tanimoto_list))
-    return sorted(tanimoto_list, key=itemgetter(2), reverse=True)[:n]
+    return sorted(tanimoto_list, key=lambda x: x.meta.get('tanimoto'), reverse=True)[:n]
 
 
 def reactions_by_fg(group_id_list, single=True):

@@ -53,14 +53,13 @@ class SimpleSynthesis(gym.Env):
     def step(self, action):
         assert action in self.action_space, \
             "%r (%s) invalid" % (action, type(action))
-        self.state, reaction, reward, info = self.add_reagent(action)
+        self.state, reward, info = self.add_reagent(action)
         done = False
         if self.steps >= self.max_steps or reward == 1.0:
             if self.state != self.target:
                 reward = 10.0
             else:
                 done = True
-        print('reaction:', reaction)
         return self.state, reward, done, info
 
     def reset(self):
@@ -76,30 +75,34 @@ class SimpleSynthesis(gym.Env):
         if action == 'next':
             if self.reactions_list:
                 if len(self.reactions_list) == 1:
-                    state, reaction, reward = self.reactions_list[0]
+                    reaction = self.reactions_list[0]
+                    state = reaction.products[0]
+                    reward = reaction.meta
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
                         self.path.append(reaction)
                     self.reactions_list[0] = self.first_step
-                    return state, reaction, reward, {'info': 'the last molecule at the list'}
+                    return state, reward, {'info': 'the last molecule at the list'}
                 else:
-                    state, reaction, reward = self.reactions_list.pop(0)
+                    reaction = self.reactions_list.pop(0)
+                    state = reaction.products[0]
+                    reward = reaction.meta
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
                         self.path.append(reaction)
-                    return state, reaction, reward, {}
+                    return state, reward, {}
 
             else:
                 if self.state is None:
-                    return None, None, -1, {'info': 'no reaction products found'}
+                    return None, -1, {'info': 'no reaction products found'}
                 else:
                     reward = evaluation(self.state, self.target)
-                    return self.state, None, reward, {'info': 'no another reaction products at the list'}
+                    return self.state, reward, {'info': 'no another reaction products at the list'}
         if action == 'none':  # однореагентная реакция
             if self.state is None:
-                return None, None, -1, {'info': 'no current molecule'}
+                return None, -1, {'info': 'no current molecule'}
             else:
                 reactions_list = []
                 groups_list = group_list(self.state, self.db)
@@ -147,18 +150,19 @@ class SimpleSynthesis(gym.Env):
             print('REACT LIST 10 best', (len(reactions_list)), reactions_list)
             self.first_step = reactions_list[0]
             if len(reactions_list) > 1:
-                state, reaction, reward = reactions_list.pop(0)
+                reaction = reactions_list.pop(0)
+                state = reaction.products[0]
+                reward = reaction.meta
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
-                return state, reaction, reward, {}
+                return state, reward, {}
             else:
-                state, reaction, reward = reactions_list[0]
-                if self.path:
-                    self.path[-1] = reaction  # заменяем последнюю реакцию в пути
-                else:
-                    self.path.append(reaction)
+                reaction = reactions_list.pop(0)
+                state = reaction.products[0]
+                reward = reaction.meta
+                self.path.append(reaction)
                 self.reactions_list = reactions_list
-                return state, reaction, reward, {'info': 'the last molecule at the list'}
+                return state, reward, {'info': 'the last molecule at the list'}
         else:
             reward = evaluation(self.state, self.target)
-            return self.state, None, reward, {'info': 'no new reaction products at the list'}
+            return self.state, reward, {'info': 'no new reaction products at the list'}
