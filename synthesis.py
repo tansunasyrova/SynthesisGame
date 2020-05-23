@@ -77,7 +77,7 @@ class SimpleSynthesis(gym.Env):
                 if len(self.reactions_list) == 1:
                     reaction = self.reactions_list[0]
                     state = reaction.products[0]
-                    reward = reaction.meta
+                    reward = reaction.meta['tanimoto']
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
@@ -87,7 +87,7 @@ class SimpleSynthesis(gym.Env):
                 else:
                     reaction = self.reactions_list.pop(0)
                     state = reaction.products[0]
-                    reward = reaction.meta
+                    reward = reaction.meta['tanimoto']
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
@@ -152,14 +152,14 @@ class SimpleSynthesis(gym.Env):
             if len(reactions_list) > 1:
                 reaction = reactions_list.pop(0)
                 state = reaction.products[0]
-                reward = reaction.meta
+                reward = reaction.meta['tanimoto']
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
                 return state, reward, {}
             else:
                 reaction = reactions_list.pop(0)
                 state = reaction.products[0]
-                reward = reaction.meta
+                reward = reaction.meta['tanimoto']
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
                 return state, reward, {'info': 'the last molecule at the list'}
