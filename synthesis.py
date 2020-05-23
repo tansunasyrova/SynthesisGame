@@ -1,6 +1,6 @@
 from CGRdb import load_schema
 from CGRtools import Reactor
-from CGRtools.containers import MoleculeContainer
+from CGRtools.containers import MoleculeContainer, ReactionContainer
 from config import *
 from gym.utils import seeding
 from helper import *
@@ -41,7 +41,7 @@ class SimpleSynthesis(gym.Env):
         self.steps = 0
         self.max_steps = step_number
         self.np_random = None
-        self.first_step = None
+        self.saved_reactions = []
 
     def render(self, mode='human'):
         return self.path
@@ -82,7 +82,7 @@ class SimpleSynthesis(gym.Env):
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
                         self.path.append(reaction)
-                    self.reactions_list[0] = self.first_step
+                    self.reactions_list = self.saved_reactions
                     return state, reward, {'info': 'the last molecule at the list'}
                 else:
                     reaction = self.reactions_list.pop(0)
@@ -109,11 +109,11 @@ class SimpleSynthesis(gym.Env):
                 rules = reactions_by_fg(groups_list)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
-                    reactions = next(reactor([self.state]))
-                    if reactions:
+                    reaction = next(reactor([self.state]), None)
+                    if reaction:
                         # for new_mol in reactions[0].products:
                             # print('!self.state, new_mol!', self.state, new_mol)
-                        reactions_list.append(reactions)
+                        reactions_list.append(reaction)
         else:
             reactions_list = []
             with db_session:
@@ -125,30 +125,37 @@ class SimpleSynthesis(gym.Env):
                 # print('RULES', rules)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
-                    reactions = next(reactor([self.state, reagent]), None)
+                    reaction = next(reactor([self.state, reagent]), None)
                     # print('REACTIONS', reactions)
-                    if reactions:
+                    if reaction:
                         # for new_mol in reactions[0].products:
                             # print('!(2) self.state, new_mol!', self.state, new_mol)
-                        reactions_list.append(reactions)
+                        reactions_list.append(reaction)
             else:
                 groups_list = group_list(reagent, self.db)
                 rules = reactions_by_fg(groups_list)
                 # print('RULES', rules)
                 for rule in rules:
                     reactor = Reactor(rule, delete_atoms=True)
-                    reactions = list(reactor([reagent]))
+                    reaction = next(reactor([reagent]), None)
                     # print('REACTIONS', reactions)
-                    if reactions:
+                    if reaction:
                         # for new_mol in reactions[0].products:
                             # print('!(1) new_mol!', new_mol)
-                        reactions_list.append(reactions[0])
+                        reactions_list.append(reaction)
 
         if reactions_list:
+            reactions_list = list(set(reactions_list))
+            react_list = []
+            for reaction in reactions_list:
+                product = max(reaction.products)
+                meta = {'tanimoto': evaluation(product, self.target)}
+                new_reaction = ReactionContainer(reactants=reaction.reactants, products=[product], meta=meta)
+                react_list.append(new_reaction)
             # print('REACT LIST1', len(reactions_list), reactions_list)
-            reactions_list = best_n_molecules(reactions_list, self.target, 10)
+            reactions_list = best_n_molecules(react_list, 10)
             print('REACT LIST 10 best', (len(reactions_list)), reactions_list)
-            self.first_step = reactions_list[0]
+            self.saved_reactions = reactions_list
             if len(reactions_list) > 1:
                 reaction = reactions_list.pop(0)
                 state = reaction.products[0]

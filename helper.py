@@ -30,17 +30,17 @@ def evaluation(mol1, mol2):
     return common / (mol1_c + mol2_c - common)
 
 
-def best_n_molecules(reactions_list, target, n):
-    tanimoto_list = []
-    for reaction in reactions_list:
-        # print('i am reaction from reactionlist', reaction)
-        # print('!reaction.products!', reaction.products)
-        product = [sorted(reaction.products, key=lambda x: x.molecular_mass, reverse=True)][0]
-        meta = {'tanimoto': evaluation(product[0], target)}
-        new_reaction = ReactionContainer(reactants=reaction.reactants, products=product, meta=meta)
-        tanimoto_list.append(new_reaction)
-    tanimoto_list = list(set(tanimoto_list))
-    return sorted(tanimoto_list, key=lambda x: x.meta.get('tanimoto'), reverse=True)[:n]
+def best_n_molecules(reactions_list, n):
+    # tanimoto_list = []
+    # for reaction in reactions_list:
+    #     # print('i am reaction from reactionlist', reaction)
+    #     # print('!reaction.products!', reaction.products)
+    #     product = [sorted(reaction.products, key=lambda x: x.molecular_mass, reverse=True)][0]
+    #     meta = {'tanimoto': evaluation(product[0], target)}
+    #     new_reaction = ReactionContainer(reactants=reaction.reactants, products=product, meta=meta)
+    #     tanimoto_list.append(new_reaction)
+    # # tanimoto_list = list(set(tanimoto_list))
+    return sorted(reactions_list, key=lambda x: x.meta.get('tanimoto'), reverse=True)[:n]
 
 
 def reactions_by_fg(group_id_list, single=True):
