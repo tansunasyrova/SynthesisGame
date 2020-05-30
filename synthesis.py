@@ -67,6 +67,7 @@ class SimpleSynthesis(gym.Env):
         self.steps = 0
         self.reactions_list = []
         self.path = []
+        self.saved_reactions = []
         return self.state
 
     def add_reagent(self, action):
@@ -113,7 +114,7 @@ class SimpleSynthesis(gym.Env):
                     if reaction:
                         # for new_mol in reactions[0].products:
                             # print('!self.state, new_mol!', self.state, new_mol)
-                        reactions_list.append(reaction)
+                        reactions_list.append((reaction, rule))
         else:
             reactions_list = []
             with db_session:
@@ -130,27 +131,30 @@ class SimpleSynthesis(gym.Env):
                     if reaction:
                         # for new_mol in reactions[0].products:
                             # print('!(2) self.state, new_mol!', self.state, new_mol)
-                        reactions_list.append(reaction)
+                        reactions_list.append((reaction, rule))
             else:
-                groups_list = group_list(reagent, self.db)
-                rules = reactions_by_fg(groups_list)
-                # print('RULES', rules)
-                for rule in rules:
-                    reactor = Reactor(rule, delete_atoms=True)
-                    reaction = next(reactor([reagent]), None)
-                    # print('REACTIONS', reactions)
-                    if reaction:
-                        # for new_mol in reactions[0].products:
-                            # print('!(1) new_mol!', new_mol)
-                        reactions_list.append(reaction)
+                self.state = reagent
+                reward = evaluation(self.state, self.target)
+                return self.state, reward, {'info': 'the first molecule in the path'}
+                # groups_list = group_list(reagent, self.db)
+                # rules = reactions_by_fg(groups_list)
+                # # print('RULES', rules)
+                # for rule in rules:
+                #     reactor = Reactor(rule, delete_atoms=True)
+                #     reaction = next(reactor([reagent]), None)
+                #     # print('REACTIONS', reactions)
+                #     if reaction:
+                #         # for new_mol in reactions[0].products:
+                #             # print('!(1) new_mol!', new_mol)
+                #         reactions_list.append((reaction, rule))
 
         if reactions_list:
             reactions_list = list(set(reactions_list))
             react_list = []
-            for reaction in reactions_list:
-                product = max(reaction.products)
-                meta = {'tanimoto': evaluation(product, self.target)}
-                new_reaction = ReactionContainer(reactants=reaction.reactants, products=[product], meta=meta)
+            for i in reactions_list:
+                product = max(i[0].products, key=lambda x: len(list(x.atoms())))
+                meta = {'tanimoto': evaluation(product, self.target), 'rule': i[1]}
+                new_reaction = ReactionContainer(reactants=i[0].reactants, products=[product], meta=meta)
                 react_list.append(new_reaction)
             # print('REACT LIST1', len(reactions_list), reactions_list)
             reactions_list = best_n_molecules(react_list, 10)
@@ -164,7 +168,7 @@ class SimpleSynthesis(gym.Env):
                 self.reactions_list = reactions_list
                 return state, reward, {}
             else:
-                reaction = reactions_list.pop(0)
+                reaction = reactions_list[0]
                 state = reaction.products[0]
                 reward = reaction.meta['tanimoto']
                 self.path.append(reaction)

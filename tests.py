@@ -10,7 +10,7 @@ os.environ['PATH'] = '/home/tansu/game'
 os.environ['PATH'] += ':/home/tansu/venv/bin'
 
 # 736786, 'next'
-# 736785, 'none'
+# 736785, 'none' 'next'
 
 
 def random_func(n):
@@ -32,7 +32,6 @@ target = SMILESread(StringIO("CCCOC")).read()[0]
 target.implicify_hydrogens()
 print(target)
 play = synthesis.SimpleSynthesis(target, step_number=1000)
-
 
 random_func(1000)
 
@@ -80,3 +79,13 @@ random_func(1000)
 # print('16!', q7)
 # print('PATH:', play.render())
 # print('\n'.join(map(str, play.render())))
+
+a = play.step(736)  # none - однореагентная реакция, но там ничего нет, правильный отклик 'no current molecule'
+print('1!', a)
+b = play.step(736800)
+print('2!', b)
+c = play.step(920000)
+print('3!', c)
+d = play.step(9200000)
+print('4!', d)
+print('\n'.join(map(str, play.render())))

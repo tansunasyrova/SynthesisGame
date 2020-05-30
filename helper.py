@@ -13,8 +13,9 @@ def dictionary(db):
     for n, id in enumerate(mol_ids):
         mol_dict[n] = id
         a += 1
-    mol_dict[a] = 'none'
-    mol_dict[a + 1] = 'next'
+    mol_dict[a] = 'next'
+    for i in range(a+1, a+184196):
+        mol_dict[i] = 'none'
     return mol_dict
 
 
