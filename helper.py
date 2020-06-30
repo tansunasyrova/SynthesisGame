@@ -1,8 +1,13 @@
-from CGRtools.containers import ReactionContainer
+from CGRtools.containers import MoleculeContainer
 from CIMtools.preprocessing import FragmentorFingerprint
 from config import *
 from operator import itemgetter
+from pmapper.customize import load_factory
 from pony.orm import db_session
+from rdkit import Chem, DataStructs
+from rdkit.Chem import Crippen
+from rdkit.Chem.Pharm2D import Generate
+from rdkit.Chem.Pharm2D.SigFactory import SigFactory
 
 
 def dictionary(db):
@@ -32,16 +37,15 @@ def evaluation(mol1, mol2):
 
 
 def best_n_molecules(reactions_list, n):
-    # tanimoto_list = []
-    # for reaction in reactions_list:
-    #     # print('i am reaction from reactionlist', reaction)
-    #     # print('!reaction.products!', reaction.products)
-    #     product = [sorted(reaction.products, key=lambda x: x.molecular_mass, reverse=True)][0]
-    #     meta = {'tanimoto': evaluation(product[0], target)}
-    #     new_reaction = ReactionContainer(reactants=reaction.reactants, products=product, meta=meta)
-    #     tanimoto_list.append(new_reaction)
-    # # tanimoto_list = list(set(tanimoto_list))
     return sorted(reactions_list, key=lambda x: x.meta.get('tanimoto'), reverse=True)[:n]
+
+
+def best_n_logp(reactions_list, n):
+    return sorted(reactions_list, key=lambda x: x.meta.get('log_p'), reverse=True)[:n]
+
+
+def best_pharm(reactions_list, n):
+    return sorted(reactions_list, key=lambda x: x.meta.get('pharm'), reverse=True)[:n]
 
 
 def reactions_by_fg(group_id_list, single=True):
@@ -67,4 +71,51 @@ def group_list(structure, db):
     return groups_list
 
 
-__all__ = ['dictionary', 'evaluation', 'best_n_molecules', 'reactions_by_fg', 'group_list']
+def logp(mol):
+    print('mol', mol)
+    #a = mol.depict()
+    mol = str(mol)
+    mol = mol.replace('N(=O)O', '[N+](=O)[O-]')
+    mol = mol.replace('N(O)=O', '[N+]([O-])=O')
+    mol = mol.replace('n(O)', '[n+]([O-])')
+    print('mol!!', mol)
+    #mol.kekule()
+    m = Chem.MolFromSmiles(mol, sanitize=True)
+    try:
+        logp = Chem.Crippen.MolLogP(m)
+        return logp
+    except:
+        return -101
+
+
+def pharmacophore(mol, target):
+    i = 0
+    print('mol/target', mol, target)
+    mol.standardize()
+    target.standardize()
+    mol = str(mol)
+    mol = mol.replace('N(=O)O', '[N+](=O)[O-]')
+    mol = mol.replace('N(O)=O', '[N+]([O-])=O')
+    mol = mol.replace('n(O)', '[n+]([O-])')
+    target = str(target)
+    target = target.replace('N(=O)O', '[N+](=O)[O-]')
+    target = target.replace('N(O)=O', '[N+]([O-])=O')
+    target = target.replace('n(O)', '[n+]([O-])')
+    featfactory = load_factory()
+    sigfactory = SigFactory(featfactory, minPointCount=2, maxPointCount=3, trianglePruneBins=False)
+    sigfactory.SetBins([(0, 2), (2, 5), (5, 8)])
+    sigfactory.Init()
+    mol1 =Chem.MolFromSmiles(mol)
+    mol2 =Chem.MolFromSmiles(target)
+    if mol1 and mol2:
+        fp1 = Generate.Gen2DFingerprint(mol1, sigfactory)
+        fp2 = Generate.Gen2DFingerprint(mol2, sigfactory)
+        sims = DataStructs.TanimotoSimilarity(fp1, fp2)
+        return sims
+    else:
+        i = i + 1
+        print('ошибка', i, mol)
+        return -100
+
+
+__all__ = ['dictionary', 'evaluation', 'best_n_molecules', 'reactions_by_fg', 'group_list', 'logp', 'best_n_logp', 'best_pharm', 'pharmacophore']

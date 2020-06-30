@@ -78,7 +78,7 @@ class SimpleSynthesis(gym.Env):
                 if len(self.reactions_list) == 1:
                     reaction = self.reactions_list[0]
                     state = reaction.products[0]
-                    reward = reaction.meta['tanimoto']
+                    reward = reaction.meta['pharm']
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
@@ -88,7 +88,7 @@ class SimpleSynthesis(gym.Env):
                 else:
                     reaction = self.reactions_list.pop(0)
                     state = reaction.products[0]
-                    reward = reaction.meta['tanimoto']
+                    reward = reaction.meta['pharm']
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
@@ -99,7 +99,7 @@ class SimpleSynthesis(gym.Env):
                 if self.state is None:
                     return None, -1, {'info': 'no reaction products found'}
                 else:
-                    reward = evaluation(self.state, self.target)
+                    reward = pharmacophore(self.state, self.target)
                     return self.state, reward, {'info': 'no another reaction products at the list'}
         if action == 'none':  # однореагентная реакция
             if self.state is None:
@@ -135,8 +135,8 @@ class SimpleSynthesis(gym.Env):
             else:
                 self.state = reagent
                 # print('reagent', reagent)
-                # print('LOGPPPPPPPPPP', logp(reagent))
-                reward = evaluation(self.state, self.target)
+                print('pharmacophore', pharmacophore(self.state, self.target))
+                reward = pharmacophore(self.state, self.target)
                 return self.state, reward, {'info': 'the first molecule in the path'}
                 # groups_list = group_list(reagent, self.db)
                 # rules = reactions_by_fg(groups_list)
@@ -155,27 +155,27 @@ class SimpleSynthesis(gym.Env):
             react_list = []
             for i in reactions_list:
                 product = max(i[0].products, key=lambda x: len(list(x.atoms())))
-                meta = {'tanimoto': evaluation(product, self.target), 'rule': i[1]}
+                meta = {'pharm': pharmacophore(product, self.target), 'rule': i[1]}
                 new_reaction = ReactionContainer(reactants=i[0].reactants, products=[product], meta=meta)
                 react_list.append(new_reaction)
             # print('REACT LIST1', len(reactions_list), reactions_list)
-            reactions_list = best_n_molecules(react_list, 10)
+            reactions_list = best_pharm(react_list, 10)
             print('REACT LIST 10 best', (len(reactions_list)), reactions_list)
             self.saved_reactions = reactions_list
             if len(reactions_list) > 1:
                 reaction = reactions_list.pop(0)
                 state = reaction.products[0]
-                reward = reaction.meta['tanimoto']
+                reward = reaction.meta['pharm']
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
                 return state, reward, {}
             else:
                 reaction = reactions_list[0]
                 state = reaction.products[0]
-                reward = reaction.meta['tanimoto']
+                reward = reaction.meta['pharm']
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
                 return state, reward, {'info': 'the last molecule at the list'}
         else:
-            reward = evaluation(self.state, self.target)
+            reward = pharmacophore(self.state, self.target)
             return self.state, reward, {'info': 'no new reaction products at the list'}

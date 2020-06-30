@@ -27,8 +27,7 @@ class SimpleSynthesis(gym.Env):
         The maximum number of steps is reached.
     """
 
-    def __init__(self, target, step_number=10):
-        self.target = target
+    def __init__(self, step_number=10):
         with db_session:
             self.db = load_schema('bb', user=user, password=password, database=database, host=host)
         self.map = dictionary(self.db)
@@ -55,10 +54,7 @@ class SimpleSynthesis(gym.Env):
             "%r (%s) invalid" % (action, type(action))
         self.state, reward, info = self.add_reagent(action)
         done = False
-        if self.steps >= self.max_steps or reward == 1.0:
-            if self.state != self.target:
-                reward = 10.0
-            else:
+        if self.steps >= self.max_steps:
                 done = True
         return self.state, reward, done, info
 
@@ -78,7 +74,7 @@ class SimpleSynthesis(gym.Env):
                 if len(self.reactions_list) == 1:
                     reaction = self.reactions_list[0]
                     state = reaction.products[0]
-                    reward = reaction.meta['tanimoto']
+                    reward = reaction.meta['log_p']
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
@@ -88,7 +84,7 @@ class SimpleSynthesis(gym.Env):
                 else:
                     reaction = self.reactions_list.pop(0)
                     state = reaction.products[0]
-                    reward = reaction.meta['tanimoto']
+                    reward = reaction.meta['log_p']
                     if self.path:
                         self.path[-1] = reaction  # заменяем последнюю реакцию в пути
                     else:
@@ -97,13 +93,13 @@ class SimpleSynthesis(gym.Env):
 
             else:
                 if self.state is None:
-                    return None, -1, {'info': 'no reaction products found'}
+                    return None, -100, {'info': 'no reaction products found'}
                 else:
-                    reward = evaluation(self.state, self.target)
+                    reward = logp(self.state)
                     return self.state, reward, {'info': 'no another reaction products at the list'}
         if action == 'none':  # однореагентная реакция
             if self.state is None:
-                return None, -1, {'info': 'no current molecule'}
+                return None, -100, {'info': 'no current molecule'}
             else:
                 reactions_list = []
                 groups_list = group_list(self.state, self.db)
@@ -136,46 +132,36 @@ class SimpleSynthesis(gym.Env):
                 self.state = reagent
                 # print('reagent', reagent)
                 # print('LOGPPPPPPPPPP', logp(reagent))
-                reward = evaluation(self.state, self.target)
+                reward = logp(self.state)
                 return self.state, reward, {'info': 'the first molecule in the path'}
-                # groups_list = group_list(reagent, self.db)
-                # rules = reactions_by_fg(groups_list)
-                # # print('RULES', rules)
-                # for rule in rules:
-                #     reactor = Reactor(rule, delete_atoms=True)
-                #     reaction = next(reactor([reagent]), None)
-                #     # print('REACTIONS', reactions)
-                #     if reaction:
-                #         # for new_mol in reactions[0].products:
-                #             # print('!(1) new_mol!', new_mol)
-                #         reactions_list.append((reaction, rule))
 
         if reactions_list:
             reactions_list = list(set(reactions_list))
             react_list = []
             for i in reactions_list:
                 product = max(i[0].products, key=lambda x: len(list(x.atoms())))
-                meta = {'tanimoto': evaluation(product, self.target), 'rule': i[1]}
+                log_p = logp(product)
+                meta = {'log_p': log_p, 'rule': i[1]}
                 new_reaction = ReactionContainer(reactants=i[0].reactants, products=[product], meta=meta)
                 react_list.append(new_reaction)
             # print('REACT LIST1', len(reactions_list), reactions_list)
-            reactions_list = best_n_molecules(react_list, 10)
+            reactions_list = best_n_logp(react_list, 10)
             print('REACT LIST 10 best', (len(reactions_list)), reactions_list)
             self.saved_reactions = reactions_list
             if len(reactions_list) > 1:
                 reaction = reactions_list.pop(0)
                 state = reaction.products[0]
-                reward = reaction.meta['tanimoto']
+                reward = reaction.meta['log_p']
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
                 return state, reward, {}
             else:
                 reaction = reactions_list[0]
                 state = reaction.products[0]
-                reward = reaction.meta['tanimoto']
+                reward = reaction.meta['log_p']
                 self.path.append(reaction)
                 self.reactions_list = reactions_list
                 return state, reward, {'info': 'the last molecule at the list'}
         else:
-            reward = evaluation(self.state, self.target)
+            reward = logp(self.state)
             return self.state, reward, {'info': 'no new reaction products at the list'}
